@@ -1,0 +1,97 @@
+name: devin-desktop-next (check)
+
+on:
+  schedule:
+    # Run every 12 hours
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      has_update: ${{ steps.check.outputs.has_update }}
+      new_version: ${{ steps.check.outputs.new_version }}
+      sha256: ${{ steps.check.outputs.sha256 }}
+      filename: ${{ steps.check.outputs.filename }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch latest version from APT repo (next channel)
+        id: latest
+        run: |
+          APT_BASE="https://windsurf-stable.codeiumdata.com/mQfcApCOdSLoWOSI/apt"
+          PACKAGES_URL="$APT_BASE/dists/next/main/binary-amd64/Packages"
+
+          packages_content=$(curl -fsSL "$PACKAGES_URL")
+
+          # Parse the devin-desktop-next stanza in a single pass.
+          # The repo also ships a windsurf-next transitional stub — skip it.
+          read -r apt_version sha256 filename < <(echo "$packages_content" | awk '
+            /^Package: devin-desktop-next$/ { p=1; v=""; s=""; f="" }
+            p && /^Version:/  { v=$2 }
+            p && /^SHA256:/   { s=$2 }
+            p && /^Filename:/ { f=$2 }
+            p && /^$/ { if (v && s && f) { print v, s, f; exit }; p=0 }
+          ')
+
+          if [[ -z "$apt_version" || -z "$sha256" || -z "$filename" ]]; then
+            echo "ERROR: Failed to parse Packages file"
+            echo "$packages_content"
+            exit 1
+          fi
+
+          # APT:  3.1.1005+next.296eca6010-1780977384
+          # Arch: 3.1.1005_next.296eca6010
+          # '+' -> '_', then drop the Debian revision after the first '-'
+          arch_version=$(echo "$apt_version" | sed 's/+/_/g; s/-.*//')
+
+          echo "apt_version=$apt_version"
+          echo "arch_version=$arch_version"
+          echo "sha256=$sha256"
+          echo "filename=$filename"
+
+          echo "arch_version=$arch_version" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+          echo "filename=$filename" >> "$GITHUB_OUTPUT"
+
+      - name: Read current version from repo PKGBUILD
+        id: current
+        run: |
+          cur=$(grep -E '^pkgver=' devin-desktop-next/PKGBUILD | head -1 | cut -d= -f2)
+          echo "version=$cur" >> "$GITHUB_OUTPUT"
+
+      - name: Compare versions
+        id: check
+        run: |
+          current="${{ steps.current.outputs.version }}"
+          latest="${{ steps.latest.outputs.arch_version }}"
+          echo "Current version: $current"
+          echo "Latest version:  $latest"
+          if [[ "$current" != "$latest" ]]; then
+            echo "has_update=true" >> "$GITHUB_OUTPUT"
+            echo "new_version=$latest" >> "$GITHUB_OUTPUT"
+            echo "sha256=${{ steps.latest.outputs.sha256 }}" >> "$GITHUB_OUTPUT"
+            echo "filename=${{ steps.latest.outputs.filename }}" >> "$GITHUB_OUTPUT"
+            echo "Update available: $current -> $latest"
+          else
+            echo "has_update=false" >> "$GITHUB_OUTPUT"
+            echo "No update available"
+          fi
+
+  update:
+    needs: check
+    if: needs.check.outputs.has_update == 'true'
+    uses: ./.github/workflows/update-aur.yml
+    with:
+      pkgdir: devin-desktop-next
+      aur_name: devin-desktop-next
+      version: ${{ needs.check.outputs.new_version }}
+      sha256: ${{ needs.check.outputs.sha256 }}
+      filename: ${{ needs.check.outputs.filename }}
+    secrets: inherit

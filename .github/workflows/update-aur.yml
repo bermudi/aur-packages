@@ -1,0 +1,132 @@
+name: Update AUR
+
+on:
+  workflow_call:
+    inputs:
+      pkgdir:
+        description: 'Directory (from repo root) containing the package sources'
+        required: true
+        type: string
+      aur_name:
+        description: 'AUR package name (the SSH repo to push to)'
+        required: true
+        type: string
+      version:
+        description: 'New package version in Arch format'
+        required: true
+        type: string
+      sha256:
+        description: 'SHA256 checksum of the new artifact'
+        required: true
+        type: string
+      filename:
+        description: 'Artifact path from the APT Packages file (for pool-change detection)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sync to latest origin
+        run: |
+          BRANCH="${GITHUB_BASE_REF:-${GITHUB_REF_NAME}}"
+          git fetch origin "$BRANCH"
+          git reset --hard "origin/$BRANCH"
+
+      - name: Update PKGBUILD
+        run: bash .github/scripts/update-pkgbuild.sh "${{ inputs.pkgdir }}" "${{ inputs.version }}" "${{ inputs.sha256 }}" "${{ inputs.filename }}"
+
+      - name: Generate .SRCINFO
+        run: bash .github/scripts/generate-srcinfo.sh "${{ inputs.pkgdir }}"
+
+      - name: Validate PKGBUILD syntax
+        run: bash -n "${{ inputs.pkgdir }}/PKGBUILD"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${{ inputs.pkgdir }}/PKGBUILD" "${{ inputs.pkgdir }}/.SRCINFO"
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "chore(${{ inputs.aur_name }}): update to ${{ inputs.version }}"
+          git push
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.aur_name }}-v${{ inputs.version }}
+          name: "${{ inputs.aur_name }} ${{ inputs.version }}"
+          body: |
+            Automated update of `${{ inputs.aur_name }}` to ${{ inputs.version }}.
+
+            - SHA256: `${{ inputs.sha256 }}`
+          draft: false
+          prerelease: false
+
+      - name: Publish to AUR
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          PKGDIR: ${{ inputs.pkgdir }}
+          AUR_NAME: ${{ inputs.aur_name }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [[ -z "${AUR_SSH_PRIVATE_KEY:-}" ]]; then
+            echo "AUR_SSH_PRIVATE_KEY secret not configured; skipping AUR push."
+            exit 0
+          fi
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/id_aur
+          chmod 600 ~/.ssh/id_aur
+          cat > ~/.ssh/config <<'EOF'
+          Host aur.archlinux.org
+            User aur
+            IdentityFile ~/.ssh/id_aur
+            StrictHostKeyChecking accept-new
+          EOF
+          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
+
+          AUR_URL="ssh://aur@aur.archlinux.org/${AUR_NAME}.git"
+
+          # Clone-or-init: AUR does not auto-create the git repo on clone,
+          # so a brand-new package must be pushed into existence.
+          if git clone "$AUR_URL" aur-repo; then
+            echo "Cloned existing AUR repo."
+          else
+            echo "AUR repo not found; initializing for first push."
+            rm -rf aur-repo
+            mkdir aur-repo
+            git -C aur-repo init -b master
+            git -C aur-repo remote add origin "$AUR_URL"
+          fi
+
+          # Replace AUR working tree with the package sources (keep .git).
+          pushd aur-repo
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          cp -a "../${PKGDIR}/." .
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "AUR repository already up to date; nothing to push."
+            exit 0
+          fi
+
+          git commit -m "Update ${AUR_NAME} to ${VERSION}"
+          git push origin HEAD:master
+          popd

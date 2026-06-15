@@ -38,6 +38,8 @@ jobs:
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "AUR package '${AUR_NAME}' exists"
           fi
+
+      - name: Fetch latest version from APT repo (next channel)
         id: latest
         run: |
           APT_BASE="https://windsurf-stable.codeiumdata.com/mQfcApCOdSLoWOSI/apt"

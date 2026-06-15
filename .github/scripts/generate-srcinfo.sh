@@ -14,9 +14,11 @@ if [[ ! -f "$PKGBUILD" ]]; then
     exit 1
 fi
 
-# Pre-declare every array we read so a PKGBUILD that omits an optional one
-# (e.g. makedepends) doesn't trip `set -u` or emit an empty `key = ` line.
-declare -a pkgname=() arch=() license=() makedepends=() depends=()
+# Pre-declare everything we read so a PKGBUILD that omits an optional field
+# (e.g. makedepends, replaces) doesn't trip `set -u` or emit an empty
+# `key = ` line. Sourcing the PKGBUILD overwrites these with real values.
+pkgbase="" pkgname="" pkgdesc="" pkgver="" pkgrel="" url=""
+declare -a arch=() license=() makedepends=() depends=()
 declare -a optdepends=() provides=() conflicts=() replaces=() options=()
 declare -a source=() sha256sums=()
 

@@ -20,9 +20,24 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Fetch latest version from APT repo (next channel)
+      - name: Check whether AUR package exists yet
+        id: aur_exists
+        env:
+          AUR_NAME: devin-desktop-next
+        run: |
+          # AUR returns resultcount:0 for an unclaimed name. A brand-new (or
+          # deleted) package must be published even when our repo PKGBUILD
+          # already matches upstream, so the first run seeds it.
+          count=$(curl -fsSL "https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=${AUR_NAME}" | grep -oE '"resultcount":[0-9]+' | cut -d: -f2)
+          if [[ "$count" == "0" ]]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "AUR package '${AUR_NAME}' does not exist yet -> will seed"
+          else
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "AUR package '${AUR_NAME}' exists"
+          fi
         id: latest
         run: |
           APT_BASE="https://windsurf-stable.codeiumdata.com/mQfcApCOdSLoWOSI/apt"
@@ -71,14 +86,18 @@ jobs:
         run: |
           current="${{ steps.current.outputs.version }}"
           latest="${{ steps.latest.outputs.arch_version }}"
+          aur_exists="${{ steps.aur_exists.outputs.exists }}"
           echo "Current version: $current"
           echo "Latest version:  $latest"
-          if [[ "$current" != "$latest" ]]; then
+          echo "AUR exists:      $aur_exists"
+          # Publish if upstream advanced, OR if the AUR package is missing
+          # (first run / re-creation after deletion).
+          if [[ "$current" != "$latest" || "$aur_exists" == "false" ]]; then
             echo "has_update=true" >> "$GITHUB_OUTPUT"
             echo "new_version=$latest" >> "$GITHUB_OUTPUT"
             echo "sha256=${{ steps.latest.outputs.sha256 }}" >> "$GITHUB_OUTPUT"
             echo "filename=${{ steps.latest.outputs.filename }}" >> "$GITHUB_OUTPUT"
-            echo "Update available: $current -> $latest"
+            echo "Publishing (version bump or initial seed)"
           else
             echo "has_update=false" >> "$GITHUB_OUTPUT"
             echo "No update available"

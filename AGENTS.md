@@ -15,6 +15,7 @@ APT deb repositories provided by Codeium (Devin Editor).
   scripts/
     update-pkgbuild.sh  # in-place: only pkgver, sha256sums[0], _apt_pool
     generate-srcinfo.sh # sources PKGBUILD -> .SRCINFO (no makepkg needed on CI)
+    check-electron-dep.sh # verify electronXX matches upstream before AUR push
   workflows/
     <pkgname>.yml       # per-pkg: poll upstream, compare, call update-aur
     update-aur.yml      # reusable: bump, commit, release, push to AUR (clone-or-init)
@@ -22,7 +23,15 @@ APT deb repositories provided by Codeium (Devin Editor).
 
 **Update pipeline:** poll APT Packages file -> parse version + sha256 + filename ->
 convert to Arch version format -> compare against repo PKGBUILD ->
-if different (or AUR pkg missing) -> call reusable updater -> commit + release -> push to AUR.
+if different (or AUR pkg missing) -> call reusable updater ->
+bump PKGBUILD + generate .SRCINFO + validate (`bash -n`, electron-dep check) ->
+commit + release -> push to AUR.
+
+The **electron-dep check** downloads the upstream deb and verifies the Electron
+major in `resources/app/package.json` matches the `electronXX` entry in PKGBUILD
+depends. If upstream bumps Electron, the pipeline fails loudly instead of shipping
+a broken PKGBUILD — bump the `depends` entry manually and the next run succeeds.
+Self-gating: no-op for packages without an `electronXX` dependency.
 
 AUR push uses **clone-or-init**: if the AUR repo doesn't exist yet, it's created on first push.
 This is why the existence gate (query AUR RPC) is important — it forces the initial seed

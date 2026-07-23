@@ -26,7 +26,7 @@ depends=(
     'alsa-lib'
     'ripgrep'
     'xdg-utils'
-    'electron39'
+    'electron42'
 )
 makedepends=()
 optdepends=(
@@ -172,7 +172,7 @@ package() {
     done
 
     # Drift assertion: if upstream bumps the Electron major, fail loudly
-    # instead of shipping a broken package.  Bump the electron39 entry in
+    # instead of shipping a broken package.  Bump the electron entry in
     # depends above when this fires.
     local _electron_dep
     _electron_dep=$(cat "$srcdir/.electron-dep" 2>/dev/null)

@@ -13,7 +13,7 @@ APT deb repositories provided by Codeium (Devin Editor).
   *.desktop             # patched for /opt relocation
 .github/
   scripts/
-    update-pkgbuild.sh  # in-place: only pkgver, sha256sums[0], _apt_pool
+    update-pkgbuild.sh  # in-place: pkgver + sha256sums[0] + _apt_pool; reset pkgrel on version bump
     generate-srcinfo.sh # sources PKGBUILD -> .SRCINFO (no makepkg needed on CI)
     check-electron-dep.sh # verify electronXX matches upstream before AUR push
   workflows/
@@ -66,9 +66,10 @@ Rule: `+` → `_`, then strip everything after the first `-` (Debian revision).
 ## Conventions
 
 **Never regenerate the entire PKGBUILD from a template in CI.** The `update-pkgbuild.sh`
-script edits only `pkgver`, the first `sha256sums` entry (the deb), and `_apt_pool`
-if upstream relocated the file. Everything else — depends, `package()`, desktop file
-references — is hand-maintained and must survive automated bumps intact.
+script edits `pkgver`, resets `pkgrel` to `1` when `pkgver` changes, updates the first
+`sha256sums` entry (the deb), and updates `_apt_pool` if upstream relocated the file.
+Everything else — depends, `package()`, desktop file references — is hand-maintained
+and must survive automated bumps intact.
 
 **.SRCINFO is always generated**, never hand-edited. The generator pre-declares all
 PKGBUILD arrays as empty to handle optional fields cleanly. Validate the output is

@@ -13,7 +13,7 @@ GitHub Actions keep the AUR in sync.
   *.desktop, etc.
 .github/
   scripts/
-    update-pkgbuild.sh    # rewrite pkgver + deb sha256 (in place) for a package
+    update-pkgbuild.sh    # rewrite pkgver + deb sha256; reset pkgrel on version bumps
     generate-srcinfo.sh   # source PKGBUILD -> .SRCINFO (no makepkg needed)
   workflows/
     <pkgname>.yml         # per-package: poll upstream, call update-aur

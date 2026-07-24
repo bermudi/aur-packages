@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Update volatile fields in a package's PKGBUILD, in place.
 #
-# Only pkgver, the first sha256sums entry (the downloaded artifact), and
-# (if it changed) _apt_pool are rewritten. The rest of the PKGBUILD — depends,
-# package(), desktop-file references — is left untouched, so hand-edits survive.
+# When pkgver changes, pkgrel is reset to 1. The first sha256sums entry (the
+# downloaded artifact) and, if needed, _apt_pool are also rewritten. The rest
+# of the PKGBUILD — depends, package(), desktop-file references — is left
+# untouched, so hand-edits survive.
 #
 # Usage: update-pkgbuild.sh <pkgdir> <arch_version> <sha256> [apt_filename]
 #   pkgdir        directory containing PKGBUILD (relative to repo root)
@@ -35,16 +36,30 @@ if [[ ! -f "$PKGBUILD" ]]; then
     exit 1
 fi
 
-# Validate it defines the arrays we rely on (without sourcing — safe parsing).
+# Validate the fields we rely on without sourcing untrusted shell code.
 grep -qE '^sha256sums=\(' "$PKGBUILD" || {
     echo "Error: PKGBUILD must define a sha256sums=( array" >&2
+    exit 1
+}
+grep -qE '^pkgrel=[0-9]+$' "$PKGBUILD" || {
+    echo "Error: PKGBUILD must define a numeric pkgrel" >&2
     exit 1
 }
 
 echo "Updating $PKGBUILD -> $NEW_VERSION"
 
-# 1) pkgver=
-sed -i -E "s|^pkgver=.*|pkgver=$NEW_VERSION|" "$PKGBUILD"
+# 1) pkgver=. A new upstream version begins a new Arch package release series,
+# so reset pkgrel to 1. Preserve pkgrel when only the artifact metadata changes.
+old_version="$(grep -E '^pkgver=' "$PKGBUILD" | head -1 | cut -d= -f2-)"
+if [[ -z "$old_version" ]]; then
+    echo "Error: PKGBUILD must define pkgver" >&2
+    exit 1
+fi
+if [[ "$old_version" != "$NEW_VERSION" ]]; then
+    sed -i -E "s|^pkgver=.*|pkgver=$NEW_VERSION|" "$PKGBUILD"
+    sed -i -E 's|^pkgrel=.*|pkgrel=1|' "$PKGBUILD"
+    echo "Version changed: reset pkgrel to 1"
+fi
 
 # 2) first sha256sums entry (the downloaded artifact is always source[0])
 awk -v new="$NEW_SHA256" '

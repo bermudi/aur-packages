@@ -104,16 +104,27 @@ jobs:
 
           AUR_URL="ssh://aur@aur.archlinux.org/${AUR_NAME}.git"
 
-          # Clone-or-init: AUR does not auto-create the git repo on clone,
-          # so a brand-new package must be pushed into existence.
-          if git clone "$AUR_URL" aur-repo; then
-            echo "Cloned existing AUR repo."
-          else
-            echo "AUR repo not found; initializing for first push."
+          # Clone-or-init: AUR does not auto-create the git repo on clone, so
+          # a brand-new package must be pushed into existence. Decide whether
+          # the package exists via the RPC info endpoint (authoritative) rather
+          # than treating *any* failed clone as "not found" — a failed clone
+          # can also mean AUR is down for maintenance or a transient
+          # network/auth error, none of which should make us reinitialize (and
+          # silently clobber) an existing package's history.
+          rpc=$(curl -fsSL "https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=${AUR_NAME}" 2>/dev/null || true)
+          aur_count=$(printf '%s\n' "$rpc" | grep -oE '"resultcount":[0-9]+' | head -1 | cut -d: -f2 || true)
+
+          if [[ "$aur_count" == "0" ]]; then
+            echo "AUR package '${AUR_NAME}' does not exist yet; initializing for first push."
             rm -rf aur-repo
             mkdir aur-repo
             git -C aur-repo init -b master
             git -C aur-repo remote add origin "$AUR_URL"
+          elif git clone "$AUR_URL" aur-repo; then
+            echo "Cloned existing AUR repo."
+          else
+            echo "::error::Failed to clone AUR repo '${AUR_NAME}' (is AUR down for maintenance?). Refusing to reinitialize an existing package."
+            exit 1
           fi
 
           # Replace AUR working tree with the package sources (keep .git).

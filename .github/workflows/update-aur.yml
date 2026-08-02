@@ -104,6 +104,24 @@ jobs:
 
           AUR_URL="ssh://aur@aur.archlinux.org/${AUR_NAME}.git"
 
+          # Clone the AUR repo with a short bounded retry. AUR's git/SSH layer
+          # periodically emits "The AUR is down due to maintenance" for a
+          # minute or two while its RPC (used below to check existence) stays
+          # up; a few retries ride those blips out instead of failing the
+          # whole publish. Each attempt is logged so this is never a black box.
+          clone_aur() {
+            local url="$1" dest="$2" attempt
+            for attempt in 1 2 3 4; do
+              if git clone "$url" "$dest"; then return 0; fi
+              rm -rf "$dest"
+              if [[ "$attempt" -lt 4 ]]; then
+                echo "AUR clone attempt $attempt failed; retrying in 20s..."
+                sleep 20
+              fi
+            done
+            return 1
+          }
+
           # Clone-or-init: AUR does not auto-create the git repo on clone, so
           # a brand-new package must be pushed into existence. Decide whether
           # the package exists via the RPC info endpoint (authoritative) rather
@@ -120,10 +138,10 @@ jobs:
             mkdir aur-repo
             git -C aur-repo init -b master
             git -C aur-repo remote add origin "$AUR_URL"
-          elif git clone "$AUR_URL" aur-repo; then
+          elif clone_aur "$AUR_URL" aur-repo; then
             echo "Cloned existing AUR repo."
           else
-            echo "::error::Failed to clone AUR repo '${AUR_NAME}' (is AUR down for maintenance?). Refusing to reinitialize an existing package."
+            echo "::error::Failed to clone AUR repo '${AUR_NAME}' after retries (is AUR down for maintenance?). Refusing to reinitialize an existing package."
             exit 1
           fi
 

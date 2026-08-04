@@ -2,7 +2,7 @@
 # Auto-updated by GitHub Actions (see .github/workflows/devin-desktop-next.yml)
 
 pkgname=devin-desktop-next
-pkgver=3.6.1027_next.0becb483ee
+pkgver=3.7.1003_next.6644e399aa
 pkgrel=1
 pkgdesc="Devin Desktop (next channel) - AI-powered editor (formerly Windsurf Editor)"
 arch=('x86_64')
@@ -46,7 +46,7 @@ source=(
 )
 
 sha256sums=(
-    'a71a86a59441b31f782b3c198693606ad78ed61aab3045a3168350dd097bd128'
+    'd562b967972816102831728e286c0946dcd992a432760d7b8170152d20788038'
     'bc9e2c12080d88a97c30da3bc675fea68bb9a202ce58b48cccfede63c9e6b467'
     '115606abbe310c96631241b6ede64379cbeed11f45dfe24da5bee8b90136507c'
     '4613d61e7d991d9a71298750f89f606597b399f134d5265d1044c69e0a38fd66'

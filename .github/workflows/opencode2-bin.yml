@@ -1,4 +1,4 @@
-name: devin-desktop-next (check)
+name: opencode2-bin (check)
 
 on:
   schedule:
@@ -15,8 +15,8 @@ jobs:
     outputs:
       has_update: ${{ steps.check.outputs.has_update }}
       new_version: ${{ steps.check.outputs.new_version }}
-      sha256: ${{ steps.check.outputs.sha256 }}
-      filename: ${{ steps.check.outputs.filename }}
+      checksum: ${{ steps.check.outputs.checksum }}
+      aarch64_sha: ${{ steps.check.outputs.aarch64_sha }}
 
     steps:
       - name: Checkout repository
@@ -25,7 +25,7 @@ jobs:
       - name: Check AUR package status (exists? published version?)
         id: aur_exists
         env:
-          AUR_NAME: devin-desktop-next
+          AUR_NAME: opencode2-bin
         run: |
           # AUR returns resultcount:0 for an unclaimed name. A brand-new (or
           # deleted) package must be published even when our repo PKGBUILD
@@ -49,49 +49,59 @@ jobs:
             echo "AUR package '${AUR_NAME}' exists at version ${aur_version}"
           fi
 
-      - name: Fetch latest version from APT repo (next channel)
+      - name: Fetch latest version + checksums from npm
         id: latest
         run: |
-          APT_BASE="https://windsurf-stable.codeiumdata.com/mQfcApCOdSLoWOSI/apt"
-          PACKAGES_URL="$APT_BASE/dists/next/main/binary-amd64/Packages"
-
-          packages_content=$(curl -fsSL "$PACKAGES_URL")
-
-          # Parse the devin-desktop-next stanza in a single pass.
-          # The repo also ships a windsurf-next transitional stub — skip it.
-          read -r apt_version sha256 filename < <(echo "$packages_content" | awk '
-            /^Package: devin-desktop-next$/ { p=1; v=""; s=""; f="" }
-            p && /^Version:/  { v=$2 }
-            p && /^SHA256:/   { s=$2 }
-            p && /^Filename:/ { f=$2 }
-            p && /^$/ { if (v && s && f) { print v, s, f; exit }; p=0 }
-          ')
-
-          if [[ -z "$apt_version" || -z "$sha256" || -z "$filename" ]]; then
-            echo "ERROR: Failed to parse Packages file"
-            echo "$packages_content"
+          # opencode v2 has no GitHub releases; it ships per-arch binaries as
+          # npm packages (@opencode-ai/cli-linux-{x64,arm64}). The `next`
+          # dist-tag of the @opencode-ai/cli stub tracks the v2 channel.
+          #
+          # Version: 0.0.0-next-17444 -> Arch: 0.0.0_next_17444 ('-' -> '_').
+          # Checksums: npm's dist.integrity is "sha512-<base64>"; decode the
+          # base64 to the raw digest and re-encode as hex for sha512sums.
+          # No tarball download needed — this is the canonical npm checksum.
+          npm_meta=$(curl -fsSL "https://registry.npmjs.org/@opencode-ai%2fcli/next")
+          npmver=$(printf '%s\n' "$npm_meta" | grep -oE '"version":"[^"]*"' | head -1 | cut -d'"' -f4)
+          if [[ -z "$npmver" ]]; then
+            echo "ERROR: could not parse version from @opencode-ai/cli/next"
+            printf '%s\n' "$npm_meta"
             exit 1
           fi
+          arch_version=$(echo "$npmver" | tr '-' '_')
+          echo "npm version: $npmver"
+          echo "arch version: $arch_version"
 
-          # APT:  3.1.1005+next.296eca6010-1780977384
-          # Arch: 3.1.1005_next.296eca6010
-          # '+' -> '_', then drop the Debian revision after the first '-'
-          arch_version=$(echo "$apt_version" | sed 's/+/_/g; s/-.*//')
+          decode_integrity() {
+            local pkg="$1"
+            local meta b64 hex
+            meta=$(curl -fsSL "https://registry.npmjs.org/${pkg}/${npmver}")
+            b64=$(printf '%s\n' "$meta" | grep -oE '"integrity":"sha512-[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/^sha512-//')
+            if [[ -z "$b64" ]]; then
+              echo "ERROR: could not parse integrity for ${pkg}"
+              exit 1
+            fi
+            hex=$(printf '%s' "$b64" | base64 -d | od -An -tx1 | tr -d ' \n')
+            if [[ ! "$hex" =~ ^[a-f0-9]{128}$ ]]; then
+              echo "ERROR: integrity decode for ${pkg} did not yield a 128-char sha512 hex ($hex)"
+              exit 1
+            fi
+            printf '%s' "$hex"
+          }
 
-          echo "apt_version=$apt_version"
-          echo "arch_version=$arch_version"
-          echo "sha256=$sha256"
-          echo "filename=$filename"
+          sha512_x86_64=$(decode_integrity "@opencode-ai/cli-linux-x64")
+          sha512_aarch64=$(decode_integrity "@opencode-ai/cli-linux-arm64")
+          echo "sha512 x86_64:  $sha512_x86_64"
+          echo "sha512 aarch64: $sha512_aarch64"
 
           echo "arch_version=$arch_version" >> "$GITHUB_OUTPUT"
-          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
-          echo "filename=$filename" >> "$GITHUB_OUTPUT"
+          echo "checksum=$sha512_x86_64" >> "$GITHUB_OUTPUT"
+          echo "aarch64_sha=$sha512_aarch64" >> "$GITHUB_OUTPUT"
 
       - name: Read current version from repo PKGBUILD
         id: current
         run: |
-          pkgver=$(grep -E '^pkgver=' devin-desktop-next/PKGBUILD | head -1 | cut -d= -f2)
-          pkgrel=$(grep -E '^pkgrel=' devin-desktop-next/PKGBUILD | head -1 | cut -d= -f2)
+          pkgver=$(grep -E '^pkgver=' opencode2-bin/PKGBUILD | head -1 | cut -d= -f2)
+          pkgrel=$(grep -E '^pkgrel=' opencode2-bin/PKGBUILD | head -1 | cut -d= -f2)
           echo "version=$pkgver" >> "$GITHUB_OUTPUT"
           # Full pkgver-pkgrel, same shape as the AUR RPC "Version" field, so
           # the compare step also catches pkgrel-only drift (fix commits) and
@@ -121,8 +131,8 @@ jobs:
           if [[ "$current" != "$latest" || "$aur_exists" == "false" || "$repo_full" != "$aur_version" ]]; then
             echo "has_update=true" >> "$GITHUB_OUTPUT"
             echo "new_version=$latest" >> "$GITHUB_OUTPUT"
-            echo "sha256=${{ steps.latest.outputs.sha256 }}" >> "$GITHUB_OUTPUT"
-            echo "filename=${{ steps.latest.outputs.filename }}" >> "$GITHUB_OUTPUT"
+            echo "checksum=${{ steps.latest.outputs.checksum }}" >> "$GITHUB_OUTPUT"
+            echo "aarch64_sha=${{ steps.latest.outputs.aarch64_sha }}" >> "$GITHUB_OUTPUT"
             echo "Publishing (version bump, initial seed, or AUR reconciliation)"
           else
             echo "has_update=false" >> "$GITHUB_OUTPUT"
@@ -134,9 +144,9 @@ jobs:
     if: needs.check.outputs.has_update == 'true'
     uses: ./.github/workflows/update-aur.yml
     with:
-      pkgdir: devin-desktop-next
-      aur_name: devin-desktop-next
+      pkgdir: opencode2-bin
+      aur_name: opencode2-bin
       version: ${{ needs.check.outputs.new_version }}
-      checksum: ${{ needs.check.outputs.sha256 }}
-      filename: ${{ needs.check.outputs.filename }}
+      checksum: ${{ needs.check.outputs.checksum }}
+      aarch64_sha: ${{ needs.check.outputs.aarch64_sha }}
     secrets: inherit

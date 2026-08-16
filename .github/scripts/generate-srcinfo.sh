@@ -47,6 +47,22 @@ _pb="${pkgbase:-$pkgname}"
     for v in "${source[@]}";      do printf '\tsource = %s\n'       "$v"; done
     for v in "${sha256sums[@]}";  do printf '\tsha256sums = %s\n'   "$v"; done
 
+    # Arch-specific attributes. Same shape and ordering as `makepkg
+    # --printsrcinfo`: per arch, source/relations first, then hash sums in
+    # known_hash_algos order (ck, md5, sha1..sha512, b2). Omitted when the
+    # package only uses flat arrays (e.g. devin-desktop-next).
+    for _a in "${arch[@]}"; do
+        [[ "$_a" = any ]] && continue
+        for _attr in source provides conflicts depends replaces optdepends makedepends checkdepends; do
+            _ref="${_attr}_${_a}[@]"
+            for _v in "${!_ref}"; do printf '\t%s_%s = %s\n' "$_attr" "$_a" "$_v"; done
+        done
+        for _algo in ck md5 sha1 sha224 sha256 sha384 sha512 b2; do
+            _ref="${_algo}sums_${_a}[@]"
+            for _v in "${!_ref}"; do printf '\t%ssums_%s = %s\n' "$_algo" "$_a" "$_v"; done
+        done
+    done
+
     echo ""
     echo "pkgname = ${pkgname}"
 } > "$PKGDIR/.SRCINFO"

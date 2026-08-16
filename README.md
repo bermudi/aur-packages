@@ -13,7 +13,7 @@ GitHub Actions keep the AUR in sync.
   *.desktop, etc.
 .github/
   scripts/
-    update-pkgbuild.sh    # rewrite pkgver + deb sha256; reset pkgrel on version bumps
+    update-pkgbuild.sh    # rewrite pkgver + checksums; reset pkgrel on version bumps
     generate-srcinfo.sh   # source PKGBUILD -> .SRCINFO (no makepkg needed)
   workflows/
     <pkgname>.yml         # per-package: poll upstream, call update-aur
@@ -25,6 +25,7 @@ GitHub Actions keep the AUR in sync.
 | Directory            | AUR package          | Upstream channel                  |
 |----------------------|----------------------|-----------------------------------|
 | `devin-desktop-next` | `devin-desktop-next` | Devin Desktop **next** (APT deb)  |
+| `opencode2-bin`      | `opencode2-bin`      | opencode v2 (npm preview, `next` dist-tag) |
 
 `devin-desktop-next` supersedes the old `windsurf-next` package
 (`provides`/`conflicts`/`replaces` it).

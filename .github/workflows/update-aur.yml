@@ -15,9 +15,13 @@ on:
         description: 'New package version in Arch format'
         required: true
         type: string
-      sha256:
-        description: 'SHA256 checksum of the new artifact'
+      checksum:
+        description: 'Hex checksum of the primary artifact (sha256 or sha512)'
         required: true
+        type: string
+      aarch64_sha:
+        description: 'Hex checksum for the aarch64 arch-specific checksum array (npm-sourced packages)'
+        required: false
         type: string
       filename:
         description: 'Artifact path from the APT Packages file (for pool-change detection)'
@@ -44,7 +48,7 @@ jobs:
           git reset --hard "origin/$BRANCH"
 
       - name: Update PKGBUILD
-        run: bash .github/scripts/update-pkgbuild.sh "${{ inputs.pkgdir }}" "${{ inputs.version }}" "${{ inputs.sha256 }}" "${{ inputs.filename }}"
+        run: bash .github/scripts/update-pkgbuild.sh "${{ inputs.pkgdir }}" "${{ inputs.version }}" "${{ inputs.checksum }}" "${{ inputs.filename }}" "${{ inputs.aarch64_sha }}"
 
       - name: Generate .SRCINFO
         run: bash .github/scripts/generate-srcinfo.sh "${{ inputs.pkgdir }}"
@@ -75,7 +79,7 @@ jobs:
           body: |
             Automated update of `${{ inputs.aur_name }}` to ${{ inputs.version }}.
 
-            - SHA256: `${{ inputs.sha256 }}`
+            - Checksum: `${{ inputs.checksum }}`
           draft: false
           prerelease: false
 

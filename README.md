@@ -25,6 +25,7 @@ GitHub Actions keep the AUR in sync.
 | Directory            | AUR package          | Upstream channel                  |
 |----------------------|----------------------|-----------------------------------|
 | `devin-desktop-next` | `devin-desktop-next` | Devin Desktop **next** (APT deb)  |
+| `devin-desktop`      | `devin-desktop`      | Devin Desktop **stable** (APT deb) |
 | `opencode2-bin`      | `opencode2-bin`      | opencode v2 (npm preview, `next` dist-tag) |
 
 `devin-desktop-next` supersedes the old `windsurf-next` package
@@ -36,6 +37,11 @@ GitHub Actions keep the AUR in sync.
 2. Add `.github/workflows/<pkgname>.yml` modelled on `devin-desktop-next.yml`.
 3. Ensure the `AUR_SSH_PRIVATE_KEY` repo secret is set (shared by all packages).
    The first publish creates the AUR repo automatically (clone-or-init).
+4. **Adopting an existing AUR package** (e.g. `devin-desktop`): the clone-or-init
+   logic only fires when the AUR repo is missing. For an existing package the
+   updater clones the current AUR tree and overwrites it with our sources —
+   no special handling needed, but the first push must be verified manually
+   (files, version, maintainer field) before trusting the automation.
 
 ## Secrets
 

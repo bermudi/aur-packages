@@ -1,0 +1,144 @@
+name: devin-desktop (check)
+
+on:
+  schedule:
+    # Run every 12 hours
+    - cron: '3 */12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      has_update: ${{ steps.check.outputs.has_update }}
+      new_version: ${{ steps.check.outputs.new_version }}
+      sha256: ${{ steps.check.outputs.sha256 }}
+      filename: ${{ steps.check.outputs.filename }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Check AUR package status (exists? published version?)
+        id: aur_exists
+        env:
+          AUR_NAME: devin-desktop
+        run: |
+          # AUR returns resultcount:0 for an unclaimed name. A brand-new (or
+          # deleted) package must be published even when our repo PKGBUILD
+          # already matches upstream, so the first run seeds it.
+          #
+          # We also capture the AUR Version (pkgver-pkgrel). The compare step
+          # uses it to detect a publish that landed in this repo but not on
+          # AUR — e.g. an AUR push that failed mid-flight during a maintenance
+          # window — and re-publish on the next run instead of silently
+          # sticking a version behind.
+          rpc=$(curl -fsSL "https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=${AUR_NAME}")
+          count=$(printf '%s\n' "$rpc" | grep -oE '"resultcount":[0-9]+' | cut -d: -f2)
+          if [[ "$count" == "0" ]]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "aur_version=" >> "$GITHUB_OUTPUT"
+            echo "AUR package '${AUR_NAME}' does not exist yet -> will seed"
+          else
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            aur_version=$(printf '%s\n' "$rpc" | grep -oE '"Version":"[^"]*"' | head -1 | sed -E 's/"Version":"//; s/"$//')
+            echo "aur_version=$aur_version" >> "$GITHUB_OUTPUT"
+            echo "AUR package '${AUR_NAME}' exists at version ${aur_version}"
+          fi
+
+      - name: Fetch latest version from APT repo (stable channel)
+        id: latest
+        run: |
+          APT_BASE="https://windsurf-stable.codeiumdata.com/wVxQEIWkwPUEAGf3/apt"
+          PACKAGES_URL="$APT_BASE/dists/stable/main/binary-amd64/Packages"
+
+          packages_content=$(curl -fsSL "$PACKAGES_URL")
+
+          # Parse the devin-desktop stanza in a single pass.
+          # The repo also ships a windsurf transitional stub (~800 bytes) —
+          # skip it; the real deb lives in the devin-desktop stanza.
+          read -r apt_version sha256 filename < <(echo "$packages_content" | awk '
+            /^Package: devin-desktop$/ { p=1; v=""; s=""; f="" }
+            p && /^Version:/  { v=$2 }
+            p && /^SHA256:/   { s=$2 }
+            p && /^Filename:/ { f=$2 }
+            p && /^$/ { if (v && s && f) { print v, s, f; exit }; p=0 }
+          ')
+
+          if [[ -z "$apt_version" || -z "$sha256" || -z "$filename" ]]; then
+            echo "ERROR: Failed to parse Packages file"
+            echo "$packages_content"
+            exit 1
+          fi
+
+          # APT:  3.8.20-1787282819
+          # Arch: 3.8.20
+          # Stable versions carry no channel suffix: drop the Debian
+          # revision after the first '-' and keep the rest verbatim.
+          arch_version=$(echo "$apt_version" | sed 's/-.*//')
+
+          echo "apt_version=$apt_version"
+          echo "arch_version=$arch_version"
+          echo "sha256=$sha256"
+          echo "filename=$filename"
+
+          echo "arch_version=$arch_version" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+          echo "filename=$filename" >> "$GITHUB_OUTPUT"
+
+      - name: Read current version from repo PKGBUILD
+        id: current
+        run: |
+          pkgver=$(grep -E '^pkgver=' devin-desktop/PKGBUILD | head -1 | cut -d= -f2)
+          pkgrel=$(grep -E '^pkgrel=' devin-desktop/PKGBUILD | head -1 | cut -d= -f2)
+          echo "version=$pkgver" >> "$GITHUB_OUTPUT"
+          # Full pkgver-pkgrel, same shape as the AUR RPC "Version" field, so
+          # the compare step also catches pkgrel-only drift (fix commits) and
+          # a published-but-not-pushed-to-AUR state.
+          echo "full_version=${pkgver}-${pkgrel}" >> "$GITHUB_OUTPUT"
+
+      - name: Compare versions
+        id: check
+        run: |
+          current="${{ steps.current.outputs.version }}"
+          repo_full="${{ steps.current.outputs.full_version }}"
+          latest="${{ steps.latest.outputs.arch_version }}"
+          aur_exists="${{ steps.aur_exists.outputs.exists }}"
+          aur_version="${{ steps.aur_exists.outputs.aur_version }}"
+          echo "Current version: $current"
+          echo "Latest version:  $latest"
+          echo "AUR exists:      $aur_exists"
+          echo "AUR version:     ${aur_version:-<none>}"
+          echo "Repo full ver:   $repo_full"
+          # Publish when ANY of these hold:
+          #  - upstream advanced past what the repo has (normal bump)
+          #  - the AUR package is missing (first run / re-creation after deletion)
+          #  - the AUR lags the repo: a publish landed in this repo but the
+          #    AUR push failed mid-flight (e.g. an AUR maintenance window).
+          #    Re-publishing heals the desync on the next run instead of
+          #    silently sticking a version behind.
+          if [[ "$current" != "$latest" || "$aur_exists" == "false" || "$repo_full" != "$aur_version" ]]; then
+            echo "has_update=true" >> "$GITHUB_OUTPUT"
+            echo "new_version=$latest" >> "$GITHUB_OUTPUT"
+            echo "sha256=${{ steps.latest.outputs.sha256 }}" >> "$GITHUB_OUTPUT"
+            echo "filename=${{ steps.latest.outputs.filename }}" >> "$GITHUB_OUTPUT"
+            echo "Publishing (version bump, initial seed, or AUR reconciliation)"
+          else
+            echo "has_update=false" >> "$GITHUB_OUTPUT"
+            echo "No update available"
+          fi
+
+  update:
+    needs: check
+    if: needs.check.outputs.has_update == 'true'
+    uses: ./.github/workflows/update-aur.yml
+    with:
+      pkgdir: devin-desktop
+      aur_name: devin-desktop
+      version: ${{ needs.check.outputs.new_version }}
+      checksum: ${{ needs.check.outputs.sha256 }}
+      filename: ${{ needs.check.outputs.filename }}
+    secrets: inherit

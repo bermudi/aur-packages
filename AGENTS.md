@@ -54,12 +54,16 @@ Rule: `+` → `_`, then strip everything after the first `-` (Debian revision).
 
 ### opencode v2 (npm — `opencode2-bin`)
 v2 has **no GitHub releases**; per-arch binaries are published to npm only.
-- Stub package `@opencode-ai/cli` — the `next` dist-tag tracks the v2 channel
-  and is the version source of truth (`curl https://registry.npmjs.org/@opencode-ai%2fcli/next`).
+- Stub package `@opencode-ai/cli` — dist-tags are the version source of truth.
+  **2026-08-21: upstream froze `next`/`latest` at beta-17823**; prereleases now
+  land on the `beta` tag (poll `https://registry.npmjs.org/@opencode-ai%2fcli/beta`).
+  The `dev` tag also moves (several builds/day) but is too churning for a 12h poll.
+  If this package ever goes stale again, check dist-tags first:
+  `https://registry.npmjs.org/-/package/@opencode-ai/cli/dist-tags`
 - Binary tarballs: `@opencode-ai/cli-linux-x64` / `@opencode-ai/cli-linux-arm64`,
   tarball URL `https://registry.npmjs.org/@opencode-ai/cli-linux-<arch>/-/cli-linux-<arch>-<npmver>.tgz`,
   binary at `package/bin/opencode2` (self-contained ELF, glibc only — no ripgrep dep).
-- Version conversion: npm `0.0.0-next-17444` → Arch `0.0.0_next_17444` (`-` → `_`).
+- Version conversion: npm `0.0.0-beta-17823` → Arch `0.0.0_beta_17823` (`-` → `_`).
   Reverse for URLs in PKGBUILD: `_npmver="${pkgver//_/-}"`.
 - Checksums: npm's `dist.integrity` is `sha512-<base64>`; decode the base64 and
   re-encode as hex for `sha512sums` (`printf '%s' "$b64" | base64 -d | od -An -tx1 | tr -d ' \n'`).

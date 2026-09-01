@@ -57,17 +57,19 @@ jobs:
         id: latest
         run: |
           # opencode v2 has no GitHub releases; it ships per-arch binaries as
-          # npm packages (@opencode-ai/cli-linux-{x64,arm64}). The `next`
-          # dist-tag of the @opencode-ai/cli stub tracks the v2 channel.
+          # npm packages (@opencode-ai/cli-linux-{x64,arm64}).
+          # 2026-08-21: upstream froze the `next` (and `latest`) dist-tag at
+          # beta-17823 and moved prereleases to the `beta` tag — poll that.
+          # (`dev` also moves, but with several builds/day it'd churn the AUR.)
           #
-          # Version: 0.0.0-next-17444 -> Arch: 0.0.0_next_17444 ('-' -> '_').
+          # Version: 0.0.0-beta-17823 -> Arch: 0.0.0_beta_17823 ('-' -> '_').
           # Checksums: npm's dist.integrity is "sha512-<base64>"; decode the
           # base64 to the raw digest and re-encode as hex for sha512sums.
           # No tarball download needed — this is the canonical npm checksum.
-          npm_meta=$(curl -fsSL "https://registry.npmjs.org/@opencode-ai%2fcli/next")
+          npm_meta=$(curl -fsSL "https://registry.npmjs.org/@opencode-ai%2fcli/beta")
           npmver=$(printf '%s\n' "$npm_meta" | grep -oE '"version":"[^"]*"' | head -1 | cut -d'"' -f4)
           if [[ -z "$npmver" ]]; then
-            echo "ERROR: could not parse version from @opencode-ai/cli/next"
+            echo "ERROR: could not parse version from @opencode-ai/cli beta tag"
             printf '%s\n' "$npm_meta"
             exit 1
           fi

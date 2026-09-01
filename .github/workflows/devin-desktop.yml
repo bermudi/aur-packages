@@ -36,7 +36,11 @@ jobs:
           # AUR — e.g. an AUR push that failed mid-flight during a maintenance
           # window — and re-publish on the next run instead of silently
           # sticking a version behind.
-          rpc=$(curl -fsSL "https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=${AUR_NAME}")
+          # Transient AUR network errors (TLS resets etc.) must not fail the run:
+          # retry the RPC a few times before giving up.
+          rpc=$(curl -fsSL --connect-timeout 15 --max-time 60 \
+            --retry 5 --retry-delay 10 --retry-all-errors \
+            "https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=${AUR_NAME}")
           count=$(printf '%s\n' "$rpc" | grep -oE '"resultcount":[0-9]+' | cut -d: -f2)
           if [[ "$count" == "0" ]]; then
             echo "exists=false" >> "$GITHUB_OUTPUT"

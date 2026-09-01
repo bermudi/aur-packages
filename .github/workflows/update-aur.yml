@@ -133,7 +133,9 @@ jobs:
           # can also mean AUR is down for maintenance or a transient
           # network/auth error, none of which should make us reinitialize (and
           # silently clobber) an existing package's history.
-          rpc=$(curl -fsSL "https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=${AUR_NAME}" 2>/dev/null || true)
+          rpc=$(curl -fsSL --connect-timeout 15 --max-time 60 \
+            --retry 5 --retry-delay 10 --retry-all-errors \
+            "https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=${AUR_NAME}" 2>/dev/null || true)
           aur_count=$(printf '%s\n' "$rpc" | grep -oE '"resultcount":[0-9]+' | head -1 | cut -d: -f2 || true)
 
           if [[ "$aur_count" == "0" ]]; then

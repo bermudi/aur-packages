@@ -46,7 +46,7 @@ Both hosted at `windsurf-stable.codeiumdata.com` (yes, the hostname still says "
 | channel | APT token (URL path segment) | dist | Arch pkg |
 |---------|------------------------------|------|----------|
 | next    | `mQfcApCOdSLoWOSI`           | `dists/next/main/binary-amd64/Packages`    | `devin-desktop-next` |
-| stable  | `wVxQEIWkwPUEAGf3`           | `dists/stable/main/binary-amd64/Packages`  | (not ours — `devin-desktop` maintained by luizsvdev) |
+| stable  | `wVxQEIWkwPUEAGf3`           | `dists/stable/main/binary-amd64/Packages`  | `devin-desktop` |
 
 ### Version conversion
 APT: `3.1.1005+next.296eca6010-1780977384` → Arch: `3.1.1005_next.296eca6010`
@@ -101,6 +101,30 @@ Per-package workflows pass `checksum` (primary) and, for npm packages, `aarch64_
 PKGBUILD arrays as empty to handle optional fields cleanly. Validate the output is
 byte-identical to `makepkg --printsrcinfo` after changes.
 
+## Delta (delta.dev) — investigated 2026-09-16, BLOCKED
+
+Zed Industries' beta desktop app ("AI-native code editor", GPUI/Zed fork, app-id
+`dev.zed.Delta`). **Not packageable yet** — do not re-investigate from scratch:
+
+- Artifacts live on Cloudflare R2 bucket `9a5426ad4c05881db7cff829de5f13e4`,
+  path `delta-client-releases/releases/nightly/<ver>/delta-linux-{x86_64,aarch64}.tar.gz`.
+  Every URL is S3-presigned with `X-Amz-Expires=900` (15 min) — a PKGBUILD
+  `source=` entry is impossible. Unsigned R2 path → 400; delta.dev proxy → 404.
+- Discovery is authed too: download page requires Zed sign-in + Early Access
+  terms; `/api/releases/latest` → 401 anonymous. In-app updater gets a
+  `ReleaseAssetResponse { url }` presigned URL from the authed API
+  (`https://delta.zed.dev`). No public channel exists (no GitHub releases).
+- Early Access Agreement is proprietary/no-redistribution flavored — mirroring
+  tarballs to GH Releases would need bermudi's explicit legal call. Not done.
+- When Zed ships public distribution, this is pre-mapped and quick:
+  - name `delta-bin` (free; AUR `delta` is tigris test-reducer, `delta-app` is crypto tracker)
+  - tarball is FHS-shaped: `Delta/bin/delta`, `Delta/lib/*` bundled, hicolor icons,
+    `share/applications/dev.zed.Delta.desktop` (Exec=`delta cli open %U`, `delta://` scheme)
+  - version feed while waiting: public release-notes page `delta.dev/docs/whats-in-the-latest`
+    (semver, newest first — 0.16.0 as of 2026-09-16)
+  - known-good seed: 0.16.0 x86_64 tarball sha256 `08975896b9312fbc4ad5c229f5b0b10e8c94f1010898d9c5022873044200553c`
+    (82 MB; copy kept at /tmp/delta-linux-x86_64.tar.gz, volatile)
+
 ## Adding a Package
 
 1. Create `<pkgname>/` with `PKGBUILD`, `.SRCINFO`, and auxiliary files.
@@ -109,8 +133,8 @@ byte-identical to `makepkg --printsrcinfo` after changes.
 
 ## Constraints
 
-- **Don't create a `devin` or `devin-desktop` package.** `devin-desktop` already exists
-  on AUR (maintained by luizsvdev). This repo only manages the next channel.
+- **Don't create a `devin` package** (name not ours on AUR). `devin-desktop` is ours since
+  2026-08-31 — adopted from luizsvdev (commit `d8250a7`); this repo manages both channels.
 - **Don't exfiltrate SSH private keys.** Use `< file` redirection for `gh secret set`.
 - **Validate before pushing AUR-side changes.** At minimum: `bash -n PKGBUILD` and
   confirm `.SRCINFO` matches `makepkg --printsrcinfo`. The CI does this automatically;

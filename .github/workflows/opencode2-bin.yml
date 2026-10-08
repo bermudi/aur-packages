@@ -57,19 +57,24 @@ jobs:
         id: latest
         run: |
           # opencode v2 has no GitHub releases; it ships per-arch binaries as
-          # npm packages (@opencode-ai/cli-linux-{x64,arm64}).
-          # 2026-08-21: upstream froze the `next` (and `latest`) dist-tag at
-          # beta-17823 and moved prereleases to the `beta` tag — poll that.
-          # (`dev` also moves, but with several builds/day it'd churn the AUR.)
+          # npm packages (@opencode/cli-linux-{x64,arm64}).
+          # 2026-10-08: upstream moved scope @opencode-ai/* -> @opencode/*
+          # (the old scope went silent 2026-09-07 with no deprecation notice)
+          # and v2 went stable — the `latest` dist-tag of @opencode/cli now
+          # carries semver 2.0.x. Poll `latest`; the `beta`/`dev` tags still
+          # carry build-numbered prereleases (`dev` churns several builds/day).
+          # If this package ever goes stale again, first check the scope/tags:
+          # https://registry.npmjs.org/-/package/@opencode/cli/dist-tags
           #
-          # Version: 0.0.0-beta-17823 -> Arch: 0.0.0_beta_17823 ('-' -> '_').
+          # Version: 2.0.24 -> Arch: 2.0.24 ('-' -> '_' if a prerelease ever
+          # lands on `latest`).
           # Checksums: npm's dist.integrity is "sha512-<base64>"; decode the
           # base64 to the raw digest and re-encode as hex for sha512sums.
           # No tarball download needed — this is the canonical npm checksum.
-          npm_meta=$(curl -fsSL "https://registry.npmjs.org/@opencode-ai%2fcli/beta")
+          npm_meta=$(curl -fsSL "https://registry.npmjs.org/@opencode%2fcli/latest")
           npmver=$(printf '%s\n' "$npm_meta" | grep -oE '"version":"[^"]*"' | head -1 | cut -d'"' -f4)
           if [[ -z "$npmver" ]]; then
-            echo "ERROR: could not parse version from @opencode-ai/cli beta tag"
+            echo "ERROR: could not parse version from @opencode/cli latest tag"
             printf '%s\n' "$npm_meta"
             exit 1
           fi
@@ -94,8 +99,8 @@ jobs:
             printf '%s' "$hex"
           }
 
-          sha512_x86_64=$(decode_integrity "@opencode-ai/cli-linux-x64")
-          sha512_aarch64=$(decode_integrity "@opencode-ai/cli-linux-arm64")
+          sha512_x86_64=$(decode_integrity "@opencode/cli-linux-x64")
+          sha512_aarch64=$(decode_integrity "@opencode/cli-linux-arm64")
           echo "sha512 x86_64:  $sha512_x86_64"
           echo "sha512 aarch64: $sha512_aarch64"
 

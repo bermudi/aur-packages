@@ -54,17 +54,28 @@ Rule: `+` → `_`, then strip everything after the first `-` (Debian revision).
 
 ### opencode v2 (npm — `opencode2-bin`)
 v2 has **no GitHub releases**; per-arch binaries are published to npm only.
-- Stub package `@opencode-ai/cli` — dist-tags are the version source of truth.
-  **2026-08-21: upstream froze `next`/`latest` at beta-17823**; prereleases now
-  land on the `beta` tag (poll `https://registry.npmjs.org/@opencode-ai%2fcli/beta`).
-  The `dev` tag also moves (several builds/day) but is too churning for a 12h poll.
-  If this package ever goes stale again, check dist-tags first:
-  `https://registry.npmjs.org/-/package/@opencode-ai/cli/dist-tags`
-- Binary tarballs: `@opencode-ai/cli-linux-x64` / `@opencode-ai/cli-linux-arm64`,
-  tarball URL `https://registry.npmjs.org/@opencode-ai/cli-linux-<arch>/-/cli-linux-<arch>-<npmver>.tgz`,
-  binary at `package/bin/opencode2` (self-contained ELF, glibc only — no ripgrep dep).
+(The GitHub repo moved `sst/opencode` → `opencode-ai/opencode`, but its
+releases are stale June-2025 v1-era artifacts — npm is the only live channel.
+Don't re-chase that.)
+- **2026-10-08: upstream moved npm scope `@opencode-ai/*` → `@opencode/*`**
+  with no deprecation notice; the old scope went silent 2026-09-07 and the
+  package sat "current" for a month while watching a dead feed. Stub package
+  is now `@opencode/cli`; v2 went stable — its `latest` dist-tag carries
+  semver `2.0.x` (~a release every 1–2 days). **Poll `latest`**:
+  `https://registry.npmjs.org/@opencode%2fcli/latest`. `beta`/`dev` still
+  carry build-numbered prereleases (`dev` churns several builds/day).
+  If this package ever goes stale again, check scope + dist-tags first:
+  `https://registry.npmjs.org/-/package/@opencode/cli/dist-tags`
+- Binary tarballs: `@opencode/cli-linux-x64` / `@opencode/cli-linux-arm64`,
+  tarball URL `https://registry.npmjs.org/@opencode/cli-linux-<arch>/-/cli-linux-<arch>-<npmver>.tgz`,
+  binary at `package/bin/opencode` (renamed from `bin/opencode2` in the 2.0.x
+  line; self-contained ELF, glibc only — no ripgrep dep).
+- We still install it as `/usr/bin/opencode2`: upstream's npm bin-map keeps
+  the `opencode2` alias, and `/usr/bin/opencode` belongs to v1 `opencode-bin`
+  on AUR (other maintainer, still actively published — both majors are alive).
 - Version conversion: npm `0.0.0-beta-17823` → Arch `0.0.0_beta_17823` (`-` → `_`).
-  Reverse for URLs in PKGBUILD: `_npmver="${pkgver//_/-}"`.
+  No-op for stable semver (`2.0.24`). Reverse for URLs in PKGBUILD:
+  `_npmver="${pkgver//_/-}"`.
 - Checksums: npm's `dist.integrity` is `sha512-<base64>`; decode the base64 and
   re-encode as hex for `sha512sums` (`printf '%s' "$b64" | base64 -d | od -An -tx1 | tr -d ' \n'`).
   No tarball download needed on CI — this is npm's canonical, signed checksum.
@@ -83,7 +94,8 @@ Devin desktop packages (`/opt/` relocation — the deb installs to `/usr/share/`
 - Upstream packages inside the deb: `usr/share/devin-desktop-next/` (next) or `usr/share/devin-desktop/` (stable)
 
 `opencode2-bin` is a plain bin package (no `/opt`, no desktop files):
-- Single `package/` extraction: `install -Dm755 "$srcdir/package/bin/opencode2" "$pkgdir/usr/bin/opencode2"`
+- Single `package/` extraction: `install -Dm755 "$srcdir/package/bin/opencode" "$pkgdir/usr/bin/opencode2"`
+  (upstream binary is `bin/opencode` since 2.0.x — see the npm section above)
 
 ## Conventions
 

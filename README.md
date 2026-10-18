@@ -26,7 +26,6 @@ GitHub Actions keep the AUR in sync.
 |----------------------|----------------------|-----------------------------------|
 | `devin-desktop-next` | `devin-desktop-next` | Devin Desktop **next** (APT deb)  |
 | `devin-desktop`      | `devin-desktop`      | Devin Desktop **stable** (APT deb) |
-| `opencode2-bin`      | `opencode2-bin`      | opencode v2 (npm preview, `next` dist-tag) |
 
 `devin-desktop-next` supersedes the old `windsurf-next` package
 (`provides`/`conflicts`/`replaces` it).

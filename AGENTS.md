@@ -2,9 +2,8 @@
 
 ## Project
 Monorepo for bermudi's AUR packages. One GitHub repo = source of truth;
-GitHub Actions keep each AUR package in sync. Two kinds of upstream:
-APT deb repositories provided by Codeium (Devin Editor), and npm-published
-preview binaries (opencode v2).
+GitHub Actions keep each AUR package in sync. Current upstreams are APT deb
+repositories provided by Codeium for Devin Desktop.
 
 ## Architecture
 ```
@@ -22,9 +21,9 @@ preview binaries (opencode v2).
     update-aur.yml      # reusable: bump, commit, release, push to AUR (clone-or-init)
 ```
 
-**Update pipeline:** poll upstream (APT Packages file or npm registry) -> parse
-version + checksum -> convert to Arch version format -> compare against repo
-PKGBUILD -> if different (or AUR pkg missing) -> call reusable updater ->
+**Update pipeline:** poll the upstream APT Packages file -> parse version +
+checksum -> convert to Arch version format -> compare against repo PKGBUILD ->
+if different (or AUR pkg missing) -> call reusable updater ->
 bump PKGBUILD + generate .SRCINFO + validate (`bash -n`, electron-dep check) ->
 commit + release -> push to AUR.
 
@@ -52,34 +51,10 @@ Both hosted at `windsurf-stable.codeiumdata.com` (yes, the hostname still says "
 APT: `3.1.1005+next.296eca6010-1780977384` → Arch: `3.1.1005_next.296eca6010`
 Rule: `+` → `_`, then strip everything after the first `-` (Debian revision).
 
-### opencode v2 (npm — `opencode2-bin`)
-v2 has **no GitHub releases**; per-arch binaries are published to npm only.
-(The GitHub repo moved `sst/opencode` → `opencode-ai/opencode`, but its
-releases are stale June-2025 v1-era artifacts — npm is the only live channel.
-Don't re-chase that.)
-- **2026-10-08: upstream moved npm scope `@opencode-ai/*` → `@opencode/*`**
-  with no deprecation notice; the old scope went silent 2026-09-07 and the
-  package sat "current" for a month while watching a dead feed. Stub package
-  is now `@opencode/cli`; v2 went stable — its `latest` dist-tag carries
-  semver `2.0.x` (~a release every 1–2 days). **Poll `latest`**:
-  `https://registry.npmjs.org/@opencode%2fcli/latest`. `beta`/`dev` still
-  carry build-numbered prereleases (`dev` churns several builds/day).
-  If this package ever goes stale again, check scope + dist-tags first:
-  `https://registry.npmjs.org/-/package/@opencode/cli/dist-tags`
-- Binary tarballs: `@opencode/cli-linux-x64` / `@opencode/cli-linux-arm64`,
-  tarball URL `https://registry.npmjs.org/@opencode/cli-linux-<arch>/-/cli-linux-<arch>-<npmver>.tgz`,
-  binary at `package/bin/opencode` (renamed from `bin/opencode2` in the 2.0.x
-  line; self-contained ELF, glibc only — no ripgrep dep).
-- We still install it as `/usr/bin/opencode2`: upstream's npm bin-map keeps
-  the `opencode2` alias, and `/usr/bin/opencode` belongs to v1 `opencode-bin`
-  on AUR (other maintainer, still actively published — both majors are alive).
-- Version conversion: npm `0.0.0-beta-17823` → Arch `0.0.0_beta_17823` (`-` → `_`).
-  No-op for stable semver (`2.0.24`). Reverse for URLs in PKGBUILD:
-  `_npmver="${pkgver//_/-}"`.
-- Checksums: npm's `dist.integrity` is `sha512-<base64>`; decode the base64 and
-  re-encode as hex for `sha512sums` (`printf '%s' "$b64" | base64 -d | od -An -tx1 | tr -d ' \n'`).
-  No tarball download needed on CI — this is npm's canonical, signed checksum.
-  Verified identical to the actual `sha512sum` of the tarball.
+### Retired package: `opencode2-bin`
+Retired by operator direction. Do not recreate or restore this package unless
+explicitly asked. Its retirement is independent of the separate AUR
+`opencode-bin` package and its OpenCode 2 migration.
 
 ### AUR
 - SSH push: `ssh://aur@aur.archlinux.org/<pkgname>.git` (default branch: `master`)
@@ -93,21 +68,17 @@ Devin desktop packages (`/opt/` relocation — the deb installs to `/usr/share/`
 - Icon sourced from `<installdir>/resources/app/resources/linux/code-next.png`
 - Upstream packages inside the deb: `usr/share/devin-desktop-next/` (next) or `usr/share/devin-desktop/` (stable)
 
-`opencode2-bin` is a plain bin package (no `/opt`, no desktop files):
-- Single `package/` extraction: `install -Dm755 "$srcdir/package/bin/opencode" "$pkgdir/usr/bin/opencode2"`
-  (upstream binary is `bin/opencode` since 2.0.x — see the npm section above)
-
 ## Conventions
 
 **Never regenerate the entire PKGBUILD from a template in CI.** The `update-pkgbuild.sh`
 script edits `pkgver`, resets `pkgrel` to `1` when `pkgver` changes, updates the first
-checksum entry (the deb sha256, or each arch-specific npm sha512), and updates `_apt_pool`
+checksum entry (flat or architecture-specific), and updates `_apt_pool`
 if upstream relocated the file. Everything else — depends, `package()`, desktop file
 references — is hand-maintained and must survive automated bumps intact.
 
-The updater supports two checksum layouts: a flat `sha256sums=(` array (devin) and
-arch-specific `sha512sums_x86_64=(`/`sha512sums_aarch64=(` arrays (opencode2-bin).
-Per-package workflows pass `checksum` (primary) and, for npm packages, `aarch64_sha`.
+The updater supports flat `sha256sums=(` arrays and architecture-specific
+`sha512sums_x86_64=(`/`sha512sums_aarch64=(` arrays. Workflows pass the primary
+checksum and any additional architecture checksums they need.
 
 **.SRCINFO is always generated**, never hand-edited. The generator pre-declares all
 PKGBUILD arrays as empty to handle optional fields cleanly. Validate the output is

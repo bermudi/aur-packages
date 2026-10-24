@@ -51,10 +51,23 @@ Both hosted at `windsurf-stable.codeiumdata.com` (yes, the hostname still says "
 APT: `3.1.1005+next.296eca6010-1780977384` → Arch: `3.1.1005_next.296eca6010`
 Rule: `+` → `_`, then strip everything after the first `-` (Debian revision).
 
-### Retired package: `opencode2-bin`
-Retired by operator direction. Do not recreate or restore this package unless
-explicitly asked. Its retirement is independent of the separate AUR
-`opencode-bin` package and its OpenCode 2 migration.
+### `opencode2-bin` — resurrected as local-only (2026-10-23), NO AUR PUBLISHING
+Retired from the AUR 2026-10-21 (commit `092a4b7`); resurrected by operator
+direction purely to keep bermudi's machine current while upstream's own
+`opencode-bin` AUR package is fixed by its maintainer (thdxr).
+
+**RED LINE: this package must never be published to the AUR.** Its workflow
+(`.github/workflows/opencode2-bin.yml`) is standalone by design — it polls
+npm, bumps the PKGBUILD, tags a release, and stops there. It does NOT call
+`update-aur.yml` and has no code path to aur.archlinux.org. Keep it that way;
+if the package ever returns to the AUR, restore the old wiring from history
+(parent of `092a4b7`) instead of adding AUR steps to the new workflow.
+
+Machine-side install: `git pull && cd opencode2-bin && makepkg -fi`.
+
+Static-field note: provides/conflicts `opencode`, binary at `/usr/bin/opencode`
+(v1 `opencode-bin` isn't installed on this machine, so the name is free).
+Revert to `opencode2` if v1 ever comes back.
 
 ### AUR
 - SSH push: `ssh://aur@aur.archlinux.org/<pkgname>.git` (default branch: `master`)

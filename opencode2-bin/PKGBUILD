@@ -1,0 +1,38 @@
+# Maintainer: bermudi <github.igizp@dabg.uk>
+# Auto-updated by GitHub Actions (see .github/workflows/opencode2-bin.yml)
+
+pkgname=opencode2-bin
+pkgver=2.1.2
+pkgrel=2
+pkgdesc='The AI coding agent built for the terminal.'
+arch=('aarch64' 'x86_64')
+url='https://opencode.ai'
+license=('MIT')
+provides=('opencode')
+conflicts=('opencode')
+depends=('glibc')
+options=('!debug' '!strip')
+
+# opencode v2 has no GitHub releases — it ships per-arch binaries to npm.
+# 2026-10-08: upstream moved scope @opencode-ai/* -> @opencode/* (the old
+# scope went silent 2026-09-07) and v2 went stable: the `latest` dist-tag of
+# @opencode/cli now carries semver 2.0.x (the `beta`/`dev` tags still carry
+# build-numbered prereleases). We track `latest`.
+# Prerelease versions use dashes (`0.0.0-beta-19271`), which map to `_` for
+# pkgver; `_npmver` below reverses that for URLs.
+_npmver="${pkgver//_/-}"
+
+# Update workflow rewrites pkgver, resets pkgrel, and rewrites the checksum
+# entries below (hex sha512, derived from the npm `dist.integrity` field).
+# Everything else here is static — do not hand-merge this file from a template.
+source_x86_64=("${pkgname}_${pkgver}_x86_64.tgz::https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-${_npmver}.tgz")
+sha512sums_x86_64=('3bcffc253f123663117839a9603b26d382a692b410d9dcda2a06b0d3acc2a147e1e74011187b39f04eb30a1d7a18853210bf1a6eb7527b6ebc2b9fc4c44f3d1b')
+source_aarch64=("${pkgname}_${pkgver}_aarch64.tgz::https://registry.npmjs.org/@opencode/cli-linux-arm64/-/cli-linux-arm64-${_npmver}.tgz")
+sha512sums_aarch64=('dbde0803d4b5b17380cce0513cc72716e6295e515e51a2939694e4d1aed332fb9cedc25b7d2e76a684f0dc0948bbbc9c6e7f131a64e68f6ece3b1b0c98108b12')
+
+package() {
+  # 2.0.x renamed the shipped binary bin/opencode2 -> bin/opencode. Installed
+  # as /usr/bin/opencode: v1's `opencode-bin` package is not installed on this
+  # machine, so the name is free. Revert to `opencode2` if v1 ever comes back.
+  install -Dm755 "$srcdir/package/bin/opencode" "$pkgdir/usr/bin/opencode"
+}

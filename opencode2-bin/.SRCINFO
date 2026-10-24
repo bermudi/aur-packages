@@ -1,0 +1,19 @@
+pkgbase = opencode2-bin
+	pkgdesc = The AI coding agent built for the terminal.
+	pkgver = 2.1.2
+	pkgrel = 2
+	url = https://opencode.ai
+	arch = aarch64
+	arch = x86_64
+	license = MIT
+	depends = glibc
+	provides = opencode
+	conflicts = opencode
+	options = !debug
+	options = !strip
+	source_aarch64 = opencode2-bin_2.1.2_aarch64.tgz::https://registry.npmjs.org/@opencode/cli-linux-arm64/-/cli-linux-arm64-2.1.2.tgz
+	sha512sums_aarch64 = dbde0803d4b5b17380cce0513cc72716e6295e515e51a2939694e4d1aed332fb9cedc25b7d2e76a684f0dc0948bbbc9c6e7f131a64e68f6ece3b1b0c98108b12
+	source_x86_64 = opencode2-bin_2.1.2_x86_64.tgz::https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-2.1.2.tgz
+	sha512sums_x86_64 = 3bcffc253f123663117839a9603b26d382a692b410d9dcda2a06b0d3acc2a147e1e74011187b39f04eb30a1d7a18853210bf1a6eb7527b6ebc2b9fc4c44f3d1b
+
+pkgname = opencode2-bin

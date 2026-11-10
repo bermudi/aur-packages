@@ -85,30 +85,6 @@ if [[ -z "$_electron_major" ]]; then
     fi
 fi
 
-# --- TEMPORARY DIAG3 (always exits 1 below) — ground truth for the NEXT
-# channel deb (3.12.1043). update-aur.yml runs nothing after this step,
-# so this branch can never publish. Remove after the probe run. ---------
-echo "--- DIAG3: pkgname=${pkgname} declared=${_electron_dep} detected=${_electron_major:-<none>}"
-if [[ -z "${_tar_archive:-}" ]]; then
-    for _a in data.tar.xz data.tar.zst data.tar.gz; do
-        if [[ -f "$_a" ]]; then _tar_archive="$_a"; break; fi
-    done
-fi
-if [[ -n "${_tar_archive:-}" ]]; then
-    echo "--- DIAG3: usr/share top-level entries:"
-    tar -tf "$_tar_archive" 2>/dev/null | grep 'usr/share/' \
-        | sed -E 's|.*usr/share/([^/]+).*|\1|' | sort -u | head -20 || true
-fi
-if [[ -n "${_binfile:-}" ]]; then
-    echo "--- DIAG3: probed binary: $_binfile"
-    strings "$_binfile" | grep -E '^(Electron|Chrome|Node\.js)/[0-9]+\.' | sort -u | head -10 || true
-else
-    echo "--- DIAG3: no binary probed"
-fi
-echo "--- END DIAG3 — exiting 1 by design ---"
-exit 1
-# ----------------------------------------------------------------------
-
 if [[ -z "$_electron_major" ]]; then
     echo "Error: could not detect Electron version from package.json or bundled binary" >&2
     exit 1

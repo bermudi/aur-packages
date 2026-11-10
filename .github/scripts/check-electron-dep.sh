@@ -59,32 +59,41 @@ if [[ -z "$_pkgjson" ]]; then
     exit 1
 fi
 
-# --- TEMPORARY DIAGNOSTIC (always exits 1 below) ----------------------
+# --- TEMPORARY DIAGNOSTIC ROUND 2 (always exits 1 below) --------------
 # Runs before the Commit/Release/AUR steps in update-aur.yml, so this
 # branch can never publish anything. Remove once 3.12 packaging is mapped.
-echo "--- DIAG: package.json bytes ---"
-wc -c < "$_pkgjson"
-echo "--- DIAG: electron-ish lines in package.json ---"
-grep -in 'electron' "$_pkgjson" | head -20 || echo "(none)"
-echo "--- DIAG: package.json head ---"
-head -c 1500 "$_pkgjson"
-echo; echo
+echo "--- DIAG2: FULL package.json ---"
+cat "$_pkgjson"
 _tar_archive=""
 for _a in data.tar.xz data.tar.zst data.tar.gz; do
     if [[ -f "$_a" ]]; then _tar_archive="$_a"; break; fi
 done
-echo "--- DIAG: top-level tar layout ---"
-tar -tf "$_tar_archive" 2>/dev/null | cut -d/ -f1-4 | sort -u | head -30 || true
-echo "--- DIAG: resources/ siblings (first 40) ---"
-tar -tf "$_tar_archive" --wildcards 'usr/share/devin-desktop*/resources/*' 2>/dev/null | head -40 || true
-echo "--- DIAG: Electron/ string in main binary ---"
-tar -xf "$_tar_archive" -C data --wildcards --no-anchored '*/devin-desktop' 2>/dev/null || true
-_bin=$(find data -type f -name devin-desktop | head -1)
-if [[ -n "$_bin" ]]; then
-    strings "$_bin" | grep -E 'Electron/[0-9]+\.[0-9]' | sort -u | head -5 || echo "(no Electron/ strings)"
-else
-    echo "(main binary not found in deb)"
+echo "--- DIAG2: deb control Depends ---"
+ar x dev.deb control.tar.zst 2>/dev/null || ar x dev.deb control.tar.xz 2>/dev/null || ar x dev.deb control.tar.gz 2>/dev/null || true
+for _c in control.tar.zst control.tar.xz control.tar.gz; do
+    if [[ -f "$_c" ]]; then
+        tar -xOf "$_c" ./control 2>/dev/null | sed -n '/^Package:/p;/^Version:/p;/^Depends:/p'
+        break
+    fi
+done
+echo "--- DIAG2: usr/share/devin-desktop top level ---"
+tar -tf "$_tar_archive" --no-anchored 'usr/share/devin-desktop/*' 2>/dev/null \
+    | sed -E 's|.*usr/share/devin-desktop/([^/]+).*|\1|' | sort -u | head -50 || true
+echo "--- DIAG2: resources/app top level ---"
+tar -tf "$_tar_archive" --no-anchored 'usr/share/devin-desktop/resources/app/*' 2>/dev/null \
+    | sed -E 's|.*resources/app/([^/]+).*|\1|' | sort -u | head -60 || true
+echo "--- DIAG2: extract both devin-desktop files, pick the biggest ---"
+rm -rf data2 && mkdir data2
+tar -xf "$_tar_archive" -C data2 --wildcards --no-anchored \
+    'usr/bin/devin-desktop' 'usr/share/devin-desktop/devin-desktop' 2>/dev/null || true
+find data2 -type f -name devin-desktop -exec ls -la {} \; || true
+_bin=$(find data2 -type f -name devin-desktop -exec du -b {} \; 2>/dev/null | sort -rn | head -1 | awk '{print $2}')
+echo "--- DIAG2: version strings in: ${_bin:-<none>} ---"
+if [[ -n "${_bin:-}" ]]; then
+    strings "$_bin" | grep -E '^(Electron|Chrome|Node\.js)/[0-9]+\.' | sort -u | head -10 || echo "(none)"
 fi
+echo "--- DIAG2: electron pin candidates under resources/app ---"
+tar -tf "$_tar_archive" --no-anchored 'usr/share/devin-desktop/resources/app/build/*' 2>/dev/null | head -20 || true
 echo "--- END DIAGNOSTIC — exiting 1 by design ---"
 exit 1
 # ----------------------------------------------------------------------

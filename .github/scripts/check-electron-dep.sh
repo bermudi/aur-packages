@@ -23,6 +23,7 @@ fi
 # Pre-declare everything we read so sourcing doesn't trip under set -u.
 declare -a depends=() source=() sha256sums=()
 _apt_base="" _apt_pool="" _upstream_ver="" _debfile=""
+pkgname=""
 
 # shellcheck source=/dev/null
 source "$PKGBUILD"
@@ -65,9 +66,10 @@ _electron_major=$(sed -n '/"electron":/s/.*"electron": *"\{0,1\} *\([0-9]\+\).*/
 # 3.12+ ships the unpruned VS Code-fork source package.json, which has no
 # runtime electron pin (only an npm script alias and build-tooling
 # devDependencies). Fall back to the version string baked into the bundled
-# Electron binary — the same fallback the PKGBUILD's build() uses. Probe
-# usr/share/*/devin-desktop (the real ELF): usr/bin/devin-desktop is a
-# wrapper without a version string, so name-based matching must not widen.
+# Electron binary — the same fallback the PKGBUILD's build() uses. The
+# binary is named after pkgname (devin-desktop, devin-desktop-next) but the
+# /usr/share dir may differ (legacy windsurf-*); usr/bin/<pkgname> is a
+# wrapper without a version string, so the probe must stay under usr/share.
 if [[ -z "$_electron_major" ]]; then
     _tar_archive=""
     for _a in data.tar.xz data.tar.zst data.tar.gz; do
@@ -75,8 +77,8 @@ if [[ -z "$_electron_major" ]]; then
     done
     rm -rf bin-extract && mkdir bin-extract
     tar -xf "$_tar_archive" -C bin-extract --wildcards --no-anchored \
-        'usr/share/*/devin-desktop' 2>/dev/null || true
-    _binfile=$(find bin-extract -type f -name devin-desktop \
+        "usr/share/*/${pkgname}" 2>/dev/null || true
+    _binfile=$(find bin-extract -type f -name "$pkgname" \
         -exec du -b {} \; 2>/dev/null | sort -rn | head -1 | awk '{print $2}')
     if [[ -n "$_binfile" ]]; then
         _electron_major=$(strings "$_binfile" | sed -n 's|.*Electron/\([0-9]\+\).*|\1|p' | head -1)

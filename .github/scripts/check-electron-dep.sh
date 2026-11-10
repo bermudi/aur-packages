@@ -59,6 +59,36 @@ if [[ -z "$_pkgjson" ]]; then
     exit 1
 fi
 
+# --- TEMPORARY DIAGNOSTIC (always exits 1 below) ----------------------
+# Runs before the Commit/Release/AUR steps in update-aur.yml, so this
+# branch can never publish anything. Remove once 3.12 packaging is mapped.
+echo "--- DIAG: package.json bytes ---"
+wc -c < "$_pkgjson"
+echo "--- DIAG: electron-ish lines in package.json ---"
+grep -in 'electron' "$_pkgjson" | head -20 || echo "(none)"
+echo "--- DIAG: package.json head ---"
+head -c 1500 "$_pkgjson"
+echo; echo
+_tar_archive=""
+for _a in data.tar.xz data.tar.zst data.tar.gz; do
+    if [[ -f "$_a" ]]; then _tar_archive="$_a"; break; fi
+done
+echo "--- DIAG: top-level tar layout ---"
+tar -tf "$_tar_archive" 2>/dev/null | cut -d/ -f1-4 | sort -u | head -30 || true
+echo "--- DIAG: resources/ siblings (first 40) ---"
+tar -tf "$_tar_archive" --wildcards 'usr/share/devin-desktop*/resources/*' 2>/dev/null | head -40 || true
+echo "--- DIAG: Electron/ string in main binary ---"
+tar -xf "$_tar_archive" -C data --wildcards --no-anchored '*/devin-desktop' 2>/dev/null || true
+_bin=$(find data -type f -name devin-desktop | head -1)
+if [[ -n "$_bin" ]]; then
+    strings "$_bin" | grep -E 'Electron/[0-9]+\.[0-9]' | sort -u | head -5 || echo "(no Electron/ strings)"
+else
+    echo "(main binary not found in deb)"
+fi
+echo "--- END DIAGNOSTIC — exiting 1 by design ---"
+exit 1
+# ----------------------------------------------------------------------
+
 # Same regex as the PKGBUILD's build() detection.
 _electron_major=$(sed -n '/"electron":/s/.*"electron": *"\{0,1\} *\([0-9]\+\).*/\1/p' "$_pkgjson" | head -1)
 if [[ -z "$_electron_major" ]]; then

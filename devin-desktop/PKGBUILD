@@ -21,7 +21,7 @@ _upstream_ver="${pkgver}" # stable versions carry no channel suffix
 _debfile="Devin-linux-x64-${_upstream_ver}.deb"
 
 depends=(
-    'electron42'
+    'electron43'
     'glibc'
     'gtk3'
     'libglvnd'

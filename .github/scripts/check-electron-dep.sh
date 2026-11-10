@@ -61,8 +61,30 @@ fi
 
 # Same regex as the PKGBUILD's build() detection.
 _electron_major=$(sed -n '/"electron":/s/.*"electron": *"\{0,1\} *\([0-9]\+\).*/\1/p' "$_pkgjson" | head -1)
+
+# 3.12+ ships the unpruned VS Code-fork source package.json, which has no
+# runtime electron pin (only an npm script alias and build-tooling
+# devDependencies). Fall back to the version string baked into the bundled
+# Electron binary — the same fallback the PKGBUILD's build() uses. Probe
+# usr/share/*/devin-desktop (the real ELF): usr/bin/devin-desktop is a
+# wrapper without a version string, so name-based matching must not widen.
 if [[ -z "$_electron_major" ]]; then
-    echo "Error: could not detect Electron version from package.json" >&2
+    _tar_archive=""
+    for _a in data.tar.xz data.tar.zst data.tar.gz; do
+        if [[ -f "$_a" ]]; then _tar_archive="$_a"; break; fi
+    done
+    rm -rf bin-extract && mkdir bin-extract
+    tar -xf "$_tar_archive" -C bin-extract --wildcards --no-anchored \
+        'usr/share/*/devin-desktop' 2>/dev/null || true
+    _binfile=$(find bin-extract -type f -name devin-desktop \
+        -exec du -b {} \; 2>/dev/null | sort -rn | head -1 | awk '{print $2}')
+    if [[ -n "$_binfile" ]]; then
+        _electron_major=$(strings "$_binfile" | sed -n 's|.*Electron/\([0-9]\+\).*|\1|p' | head -1)
+    fi
+fi
+
+if [[ -z "$_electron_major" ]]; then
+    echo "Error: could not detect Electron version from package.json or bundled binary" >&2
     exit 1
 fi
 

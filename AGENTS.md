@@ -28,9 +28,13 @@ bump PKGBUILD + generate .SRCINFO + validate (`bash -n`, electron-dep check) ->
 commit + release -> push to AUR.
 
 The **electron-dep check** downloads the upstream deb and verifies the Electron
-major in `resources/app/package.json` matches the `electronXX` entry in PKGBUILD
-depends. If upstream bumps Electron, the pipeline fails loudly instead of shipping
-a broken PKGBUILD — bump the `depends` entry manually and the next run succeeds.
+major upstream ships matches the `electronXX` entry in PKGBUILD depends. Source:
+the pin in `resources/app/package.json`; when absent (3.12+ ships the unpruned
+VS Code source package.json with no runtime electron pin), the `Electron/x.y`
+string baked into the bundled ELF `usr/share/*/devin-desktop` — the same
+fallback the PKGBUILD `build()` uses. If upstream bumps Electron, the pipeline
+fails loudly instead of shipping a broken PKGBUILD — bump the `depends` entry
+manually and the next run succeeds.
 Self-gating: no-op for packages without an `electronXX` dependency.
 
 AUR push uses **clone-or-init**: if the AUR repo doesn't exist yet, it's created on first push.
@@ -38,6 +42,16 @@ This is why the existence gate (query AUR RPC) is important — it forces the in
 when `resultcount:0`.
 
 ## Stable Reference Facts
+
+### 3.12 packaging change (mapped 2026-11-10, issue #1)
+Upstream 3.12 stopped shipping a runtime electron pin: `resources/app/package.json`
+is now the unpruned VS Code-fork source manifest (`"name": "Devin"`, version
+1.141.x, npm scripts, devDependencies — the only `electron` hits are a script
+alias and build tooling). The Electron version lives only in the bundled ELF
+`usr/share/devin-desktop/devin-desktop`, which embeds
+`Chrome/150.0.7871.250 Electron/43.8.3` in 3.12.43. Both channels moved
+`electron42` → `electron43` then. Do not probe `usr/bin/devin-desktop`: in the
+3.12 deb it is a wrapper with no version string.
 
 ### Upstream APT channels
 Both hosted at `windsurf-stable.codeiumdata.com` (yes, the hostname still says "windsurf" post-rebrand).

@@ -26,7 +26,7 @@ depends=(
     'alsa-lib'
     'ripgrep'
     'xdg-utils'
-    'electron42'
+    'electron43'
 )
 makedepends=()
 optdepends=(

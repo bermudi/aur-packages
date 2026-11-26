@@ -1,6 +1,6 @@
 pkgbase = opencode2-bin
 	pkgdesc = The AI coding agent built for the terminal.
-	pkgver = 2.4.1
+	pkgver = 2.4.2
 	pkgrel = 1
 	url = https://opencode.ai
 	arch = aarch64
@@ -11,9 +11,9 @@ pkgbase = opencode2-bin
 	conflicts = opencode
 	options = !debug
 	options = !strip
-	source_aarch64 = opencode2-bin_2.4.1_aarch64.tgz::https://registry.npmjs.org/@opencode/cli-linux-arm64/-/cli-linux-arm64-2.4.1.tgz
-	sha512sums_aarch64 = a2534a7e802e1da0ed1eb5ab96ac61d913d2a2749f0193c6265aeeeed30d78d4e51f22d2ad36c37bff8727abdd611a7b838c8a2d243c486dbae14fc80bb3e0b7
-	source_x86_64 = opencode2-bin_2.4.1_x86_64.tgz::https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-2.4.1.tgz
-	sha512sums_x86_64 = 1584009e779594b9aacbceb6ebbe2fbd15648fcc87b990051c9195dd4086431a3c68a1b9f081cf2abb296f1aee55a8e7204a5bd2df0f78eeb71ffa16e2f246e4
+	source_aarch64 = opencode2-bin_2.4.2_aarch64.tgz::https://registry.npmjs.org/@opencode/cli-linux-arm64/-/cli-linux-arm64-2.4.2.tgz
+	sha512sums_aarch64 = 3822b417079d254432636a1a7e99d26aee8599df4a90bbe4aba7f68762e1e8316245287a148bad6db0627106e02559738162711bd077dec8e61384c1bb0ff161
+	source_x86_64 = opencode2-bin_2.4.2_x86_64.tgz::https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-2.4.2.tgz
+	sha512sums_x86_64 = 8b1176874ea9f7d2c402b78fd03453a97d888012e428d6e744d36b064d1ae34938f12571de5d18c5c24e1dda2e8e25d69bdecae0b8d65d0edf092d271f0da55c
 
 pkgname = opencode2-bin
